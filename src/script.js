@@ -7,7 +7,7 @@ var myX = 1;
 var myY = 1;
 
 // Chip8 machine fontset
-/*
+
 const fontset = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -25,7 +25,7 @@ const fontset = [
     0xE0, 0x90, 0x90, 0x90, 0xE0, // D
     0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
     0xF0, 0x80, 0xF0, 0x80, 0x80  // F
-];*/
+];
 
 /// Crashing 
 
@@ -149,10 +149,10 @@ var chipCPU = {
             // reinitialize Memory
             this.memory.fill(0); // Clear memory
             
-            /* // Load the fontset into memory
-            for (let i = 0; i < 80; i++) {
+            // Load the fontset into memory
+            for (let i = 0; i < fontset.length; i++) {
                 this.memory[i] = fontset[i];
-            } */
+            } 
 
             // Load the ROM into memory starting at address 0x200
             for (let i = 0; i < byteArray.length; i++) {
@@ -220,12 +220,17 @@ var chipCPU = {
                     this.PC += 2;
                 }
                 break;
-            case 0x04:
-                cmd = "TBD"; // "SNE V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", " + b2.toString(16).padStart(2, '0').toUpperCase();
-                break;
-            case 0x05:      // LD I, addr
+            case 0x04:         // SNE Vx, byte
                 cmd = ""; 
-                this.I = addr;
+                if (this.V[n2] != b2) {
+                    this.PC += 2;
+                }
+                break;
+            case 0x05:      // SE Vx, Vx
+                cmd = ""; 
+                if (this.V[n2] == this.V[n3]) {
+                    this.PC += 2;
+                }
                 break;
             case 0x06:          // LD Vx, byte                          
                 cmd = ""; 
@@ -252,8 +257,16 @@ var chipCPU = {
                     case 0x4:
                         cmd = "TBD"; // "ADD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
                         break;
-                    case 0x5:
-                        cmd = "TBD"; // "SUB V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x5:         // SUB Vx, Vy
+                        cmd = ""; // "SUB V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                        this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;
+                        if (this.V[n2] > this.V[n3]) {
+                            this.V[0xF] = 1; // Set VF to 1 if there is no borrow
+                        } else {
+                            this.V[0xF] = 0; // Set VF to 0 if there is a borrow
+                        }
+                        // Set the result in Vx
+                        this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;                    
                         break;
                     case 0x6:
                         cmd = "TBD"; // "SHR V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
@@ -359,9 +372,10 @@ var chipCPU = {
             // Wrap the executeInstruction method to ensure it is called correctly
             str = this.executeInstruction();
             // Check if the instruction was processed
-            if (str[0] != "*") {
+            console.log("Instruction processed: " + str);
+            //if (str[0] != "*") {
                 instr_processed = false;
-            }
+            //}
             // display the instruction in div with id = "cpu-output-content" with state of registers
             const outputDiv = document.getElementById("cpu-output-content");
             if (outputDiv) {
@@ -523,7 +537,7 @@ function stepCPU() {
     // Execute a single instruction
     chipCPU.wrappedExec();
     // Update the screen
-    updateScreen();
+    // updateScreen();
 }
 
 function keyPress() {
