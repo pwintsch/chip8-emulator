@@ -211,8 +211,11 @@ var chipCPU = {
                 cmd = ""; 
                 this.PC = addr;
                 break;
-            case 0x02:
-                cmd = "TBD"; // "CALL " + addr.toString(16).padStart(3, '0').toUpperCase();
+            case 0x02:     // CALL addr
+                cmd = ""; 
+                this.stack[this.SP] = this.PC;
+                this.SP++;
+                this.PC = addr;
                 break;
             case 0x03:          // SE Vx, byte
                 cmd = ""; 
@@ -242,20 +245,36 @@ var chipCPU = {
                 break;
             case 0x08:
                 switch (n4) {
-                    case 0x0:
-                        cmd = "TBD"; // "LD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x0:      // LD Vx, Vy
+                        cmd = ""; 
+                        // Set the result in Vx
+                        this.V[n2] = this.V[n3];
                         break;
-                    case 0x1:
-                        cmd = "TBD"; // "OR V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x1:       // OR Vx, Vy
+                        cmd = ""; 
+                        // Set the result in Vx
+                        this.V[n2] = this.V[n2] | this.V[n3];
                         break;
-                    case 0x2:
-                        cmd = "TBD"; // "AND V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x2:      // AND Vx, Vy
+                        cmd = "";
+                        // Set the result in Vx
+                        this.V[n2] = this.V[n2] & this.V[n3];
                         break;
-                    case 0x3:
-                        cmd = "TBD"; // "XOR V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x3:      // XOR Vx, Vy
+                        cmd = ""; 
+                        // Set the result in Vx
+                        this.V[n2] = this.V[n2] ^ this.V[n3];
                         break;
-                    case 0x4:
-                        cmd = "TBD"; // "ADD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x4:      // ADD Vx, Vy
+                        cmd = ""; 
+                        // Set VF to 1 if there is no carry
+                        if (this.V[n2] + this.V[n3] > 0xFF) {
+                            this.V[0xF] = 1; // Set VF to 1 if there is a carry
+                        } else {
+                            this.V[0xF] = 0; // Set VF to 0 if there is no carry
+                        }
+                        // Set the result in Vx
+                        this.V[n2] = (this.V[n2] + this.V[n3]) & 0xFF; // Mask to 8 bits
                         break;
                     case 0x5:         // SUB Vx, Vy
                         cmd = ""; // "SUB V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
@@ -268,31 +287,61 @@ var chipCPU = {
                         // Set the result in Vx
                         this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;                   
                         break;
-                    case 0x6:
-                        cmd = "TBD"; // "SHR V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x6:       // SHR Vx, Vy
+                        cmd = ""; 
+                        // Set VF to 1 if the least significant bit of Vx is 1
+                        if ((this.V[n2] & 0x1) != 0) {
+                            this.V[0xF] = 1; // Set VF to 1 if the least significant bit of Vx is 1
+                        }
+                        else {
+                            this.V[0xF] = 0; // Set VF to 0 if the least significant bit of Vx is 0
+                        }
+                        // Shift Vx right by 1
+                        this.V[n2] = (this.V[n2] >> 1) & 0xFF;
                         break;
-                    case 0x7:
-                        cmd = "TBD"; // "SUBN V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x7:         // SUBN Vx, Vy
+                        cmd = ""; 
+                        if (this.V[n3] >= this.V[n2]) {
+                            this.V[0xF] = 1; // Set VF to 1 if there is no borrow
+                        }
+                        else {
+                            this.V[0xF] = 0; // Set VF to 0 if there is a borrow
+                        }
+                        // Set the result in Vx
+                        this.V[n2] = (this.V[n3] - this.V[n2]) & 0xFF;
                         break;
-                    case 0xE:
-                        cmd = "TBD"; // "SHL V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
+                    case 0xE:       // SHL Vx, Vy
+                        cmd = ""; 
+                        // Set VF to 1 if the most significant bit of Vx is 1
+                        if ((this.V[n2] & 0x80) != 0) {
+                            this.V[0xF] = 1; // Set VF to 1 if the most significant bit of Vx is 1
+                        } else {
+                            this.V[0xF] = 0; // Set VF to 0 if the most significant bit of Vx is 0
+                        }
+                        // Shift Vx left by 1
+                        this.V[n2] = (this.V[n2] << 1) & 0xFF;
                         break;
                     default:
                         cmd = "???";
                 }
                 break;
-            case 0x09:
-                cmd = "TBD"; // "SNE V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", " + b2.toString(16).padStart(2, '0').toUpperCase();
+            case 0x09:        // SNE Vx, Vy
+                cmd = "";
+                if (this.V[n2] != this.V[n3]) {
+                    this.PC += 2;
+                }
                 break;
             case 0x0A:                  // LD I, addr
                 cmd = "";
                 this.I = addr;
                 break;
-            case 0x0B:
-                cmd = "TBD"; // "JP V0, " + addr.toString(16).padStart(3, '0').toUpperCase();
+            case 0x0B:      // JP V0, addr
+                cmd = ""; 
+                this.PC = this.V[0] + addr;               
                 break;
-            case 0x0C:
-                cmd = "TBD"; // "RND V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", " + b2.toString(16).padStart(2, '0').toUpperCase();
+            case 0x0C:        // RND Vx, byte
+                cmd = ""; 
+                this.V[n2] = Math.floor(Math.random() * 256) & b2;
                 break;
             case 0x0D:         // DRW Vx, Vy, nibble
                 cmd = ""; 
@@ -325,21 +374,40 @@ var chipCPU = {
                     case 0x18:
                         cmd = "TBD"; // "LD ST, V" + n2.toString(16).padStart(1, '0').toUpperCase();
                         break;
-                    case 0x1E:
-                        cmd = "TBD"; // "ADD I, V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x1E:      // ADD I, Vx
+                        cmd = ""; 
+                        this.I += this.V[n2];
+                        if (this.I > 0xFFF) {
+                            this.V[0xF] = 1; // Set VF to 1 if there is a carry
+                        } else {
+                            this.V[0xF] = 0; // Set VF to 0 if there is no carry
+                        }
+                        this.I = this.I & 0xFFF; // Mask I to 12 bits
                         break;
                     case 0x29:          // LD F, Vn   -  Set I = location of sprite for digit Vx.
                         cmd = "TBD Load font sprites"; 
                         this.I = this.V[n2] * 5; // Assuming a font set of 5 bytes per character
                         break;
-                    case 0x33:
-                        cmd = "TBD"; // "LD B, V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x33:      // LD B, Vx   -  Store BCD representation of Vx in memory locations I, I+1, and I+2.
+                        cmd = ""; 
+                        this.memory[this.I] = this.V[n2] / 100;
+                        this.memory[this.I + 1] = (this.V[n2] / 10) % 10;
+                        this.memory[this.I + 2] = this.V[n2] % 10;
+                        //this.I += 3; // Increment I by 3 after storing BCD
                         break;
-                    case 0x55:
-                        cmd = "TBD"; // "LD [I], V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x55:      // LD [I], Vx   -  Store registers V0 to Vx in memory starting at address I.
+                        cmd = ""; 
+                        for (let i = 0; i <= n2; i++) {
+                            this.memory[this.I + i] = this.V[i];
+                        }
+                        //this.I += n2 + 1; // Increment I by the number of registers stored
                         break;
-                    case 0x65:
-                        cmd = "TBD"; // "LD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", [I]";
+                    case 0x65:     // LD Vx, [I]   -  Read registers V0 to Vx from memory starting at address I.
+                        cmd = ""; 
+                        for (let i = 0; i <= n2; i++) {
+                            this.V[i] = this.memory[this.I + i];
+                        }
+                        //this.I += n2 + 1; // Increment I by the number of registers read
                         break;
                     default:
                         cmd = "TBD"; // "???";
@@ -368,14 +436,16 @@ var chipCPU = {
     },
     wrappedExec: function() {
         instr_processed = true;
+        noOfExecs = 0;
         while (instr_processed == true) {
             // Wrap the executeInstruction method to ensure it is called correctly
             str = this.executeInstruction();
             // Check if the instruction was processed
             console.log("Instruction processed: " + str);
-            //if (str[0] != "*") {
+            if (str[0] != "*" || noOfExecs > 100) {
                 instr_processed = false;
-            //}
+            }
+            noOfExecs++;
             // display the instruction in div with id = "cpu-output-content" with state of registers
             const outputDiv = document.getElementById("cpu-output-content");
             if (outputDiv) {
@@ -516,7 +586,7 @@ function disassemble_instruction(b1, b2) {
                 case 0x33:
                     cmd = "LD B, V" + n2.toString(16).padStart(1, '0').toUpperCase();
                     break;
-                case 0x55:
+                case 0x55:      
                     cmd = "LD [I], V" + n2.toString(16).padStart(1, '0').toUpperCase();
                     break;
                 case 0x65:
