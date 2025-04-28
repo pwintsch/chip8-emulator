@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Web Page</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        canvas {
+            image-rendering: pixelated;
+            width: 640px;
+            height: 320px;
+            background: black;
+        }
+    </style>
+    <script src="script.js" defer></script>
+</head>
+<body onload='startCPU()'>
+    <header>
+        <h1>Chip8.io</h1>
+    </header>
+    <main>
+        <section id="content">
+            <p>
+                This is a basic attempt at writing a Chip8 emulator in Web technologies
+            </p>
+        </section>
+        <section id="CPU">
+            <div id="screen">
+                <canvas id="chip8-screen"></canvas>
+            </div>
+            <div id="controls">
+                <label for="rom_select">Select ROM</label>
+                <select name="rom_select" id="rom_select" onchange="loadROM(this.value)">
+                    <option disabled selected value> SELECT ROM </option>
+                    <option value="chip8-logo">Chip 8 logo</option>
+                    <option value="BC_Test">BC Test</option>
+                    <option value="ibm-logo">IBM logo</option>
+                    <option value="quirks">Quirks</option>
+                    <option value="6-keypad">6 Keypad</option>
+                    <option value="invaders">Invaders</option>
+                    <option value="SCTEST">SC test</option>
+                    <option value="test_opcode">Test opcode</option>
+                </select>
+                <button id="disassem_rom" onclick="disassemble()">Disassemble ROM</button>
+                <button id="start-emulator">Start Emulator</button>
+                <button id="stop-emulator">Stop Emulator</button>
+                <button id="reset-emulator">Reset Emulator</button>
+                <button id="step-instruction" onclick="stepCPU()">Step</button>
+            </div>
+            <div id="status">
+                <p id="status-message">Status: Ready</p>
+                <p id="fps">FPS: 0</p>
+                <p id="cycles">Cycles: 0</p>
+                <p id="rom-name">ROM: None</p>
+                <p id="rom-size">Size: 0 bytes</p>
+                <p id="instruction-message">Last instruction:</p>
+                <div id="CPU output" style="height:120px;width:400px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;">
+                    <div id="cpu-output-content">
+                        <!-- CPU output will be populated here -->
+                    </div>
+                </div>
+                <p id="disassembly-message">Disassembly:</p>
+                <div id="disassembly" style="height:120px;width:400px;border:1px solid #ccc;font:16px/26px Georgia, Garamond, Serif;overflow:auto;">
+                    <div id="disassembly-content">
+                        <!-- Disassembly output will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <footer>
+        <p>&copy; 2023 My Web Page</p>
+    </footer>
+</html>
+
+
+<!-- !DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chip8 Emulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="cpu-output-content"></div>
+    <canvas id="chip8-screen"></canvas>
+    <div>
+        <button onclick="loadROM('chip8-logo')">Load Chip8 Logo</button>
+        <button onclick="stepCPU()">Step CPU</button>
+    </div>
+    <script src="src/script.js"></script>
+</body>
+</html -->
