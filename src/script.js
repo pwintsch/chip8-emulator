@@ -259,14 +259,14 @@ var chipCPU = {
                         break;
                     case 0x5:         // SUB Vx, Vy
                         cmd = ""; // "SUB V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
-                        this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;
-                        if (this.V[n2] > this.V[n3]) {
+                        // Set VF to 1 if there is no borrow
+                        if (this.V[n2] >= this.V[n3]) {
                             this.V[0xF] = 1; // Set VF to 1 if there is no borrow
                         } else {
                             this.V[0xF] = 0; // Set VF to 0 if there is a borrow
                         }
                         // Set the result in Vx
-                        this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;                    
+                        this.V[n2] = (this.V[n2] - this.V[n3]) & 0xFF;                   
                         break;
                     case 0x6:
                         cmd = "TBD"; // "SHR V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
