@@ -238,7 +238,9 @@ var chipCPU = {
                         cmd = "";
                         this.clearScreen();
                     } else if (b2 == 0xEE) {
-                        cmd = "TBD"; // "RET";
+                        cmd = ""; // "RET";
+                        this.SP--;
+                        this.PC = this.stack[this.SP];
                     }
                 } else {
                     cmd = "TBD"; // "SYS " + addr.toString(16).padStart(3, '0').toUpperCase();
@@ -490,7 +492,7 @@ var chipCPU = {
             str = this.executeInstruction();
             // Check if the instruction was processed
             console.log("Instruction processed: " + str);
-            if (str[0] != "*" || noOfExecs > 100) {
+            if (str[0] != "*" || noOfExecs >= 0) {
                 instr_processed = false;
             }
             noOfExecs++;
