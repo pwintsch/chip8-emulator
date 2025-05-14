@@ -27,6 +27,27 @@ const fontset = [
     0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 ];
 
+
+const keyMap = {
+    '1': 0x1,
+    '2': 0x2,
+    '3': 0x3,
+    '4': 0xC,
+    'q': 0x4,
+    'w': 0x5,
+    'e': 0x6,
+    'r': 0xD,
+    'a': 0x7,
+    's': 0x8,
+    'd': 0x9,
+    'f': 0xE,
+    'z': 0xA,
+    'x': 0x0,
+    'c': 0xB,
+    'v': 0xF
+  };
+
+
 /// Crashing 
 
 // Example sprite (letter "A" shape)
@@ -124,6 +145,9 @@ var chipCPU = {
     SP: 0, // Stack pointer
     delayTimer: 0,
     soundTimer: 0,
+    totalNoOfExecs: 0,
+    waitingForKey : false,
+    waitingRegister : null,
     setupScreen: function() {
         // Setup the screen (this is a placeholder, implement actual screen setup)
         const canvas = document.getElementById('chip8-screen');
@@ -134,6 +158,7 @@ var chipCPU = {
         this.interval = setInterval(() => {
             updateScreen();
         }, 20);
+        this.totalNoOfExecs = 0;
         keyPress();
         // Fetch the ROM file
         // fetch('assets/chip8-logo.ch8')
@@ -172,6 +197,12 @@ var chipCPU = {
                 outputDiv.innerHTML = "<tt>ROM " + currentRom + " loaded successfully</tt><br>";
                 //outputDiv.innerHTML += "Memory: " + this.memory[0x200].toString(16).padStart(2, '0').toUpperCase() + " " + this.memory[0x201].toString(16).padStart(2, '0').toUpperCase();
             }
+            const romName = document.getElementById("rom-name");
+            if (romName) {
+                romName.innerHTML = "<tt>ROM: " + currentRom + "</tt>";
+            } else {
+                console.error('Div with id "rom-name" not found.');
+            }
         })
 
     },
@@ -180,6 +211,12 @@ var chipCPU = {
         display.clear();
     },
     executeInstruction: function() {
+        // Execute a single instruction
+        this.totalNoOfExecs++;
+        if (this.waitingForKey) {
+            // Halt execution until a key is pressed
+            return;
+        }
         // Fetch the instruction at the current program counter
         b1 = this.memory[this.PC];
         b2 = this.memory[this.PC + 1];
@@ -350,11 +387,19 @@ var chipCPU = {
                 break;
             case 0x0E:
                 switch (b2) {
-                    case 0x9E:
-                        cmd = "TBD"; // "SKP V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x9E:      // SKP Vx   -  Skip next instruction if key with value of Vx is pressed.
+                        cmd = "*SKP Vx"; 
+                        if (keys[Vx] == 1) {
+                            // Key in Vx is pressed
+                            this.PC += 2; // Skip next instruction
+                          }
                         break;
-                    case 0xA1:
-                        cmd = "TBD"; // "SKNP V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0xA1:     // SKNP Vx   -  Skip next instruction if key with value of Vx is not pressed.
+                        cmd = "*SKNP Vx"; 
+                        if (keys[Vx] == 0) {
+                            // Key in Vx is not pressed
+                            this.PC += 2; // Skip next instruction
+                          }
                         break;
                     default:
                         cmd = "TBD"; // "???";
@@ -365,8 +410,11 @@ var chipCPU = {
                     case 0x07:
                         cmd = "TBD"; // "LD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", DT";
                         break;
-                    case 0x0A:
-                        cmd = "TBD"; // "LD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", K";
+                    case 0x0A:          // LD Vx, K   -  Wait for a key press and store the value of the key in Vx.
+                        cmd = "*LD Vx, K   -  Wait for a key";
+                        this.waitingForKey = true;
+                        this.waitingRegister = n2;
+                        // Wait for a key press
                         break;
                     case 0x15:
                         cmd = "TBD"; // "LD DT, V" + n2.toString(16).padStart(1, '0').toUpperCase();
@@ -455,12 +503,60 @@ var chipCPU = {
                     regState += "V" + i.toString(16).padStart(1, '0').toUpperCase() + ": " + this.V[i].toString(16).padStart(2, '0').toUpperCase() + "<br>";
                 }
                 regState += "I: " + this.I.toString(16).padStart(3, '0').toUpperCase() + "<br>" + "PC: " + this.PC.toString(16).padStart(4, '0').toUpperCase() + "<br>"+ "</tt>";
-                outputDiv.innerHTML = regState ;
+                instrExecuted = "Exec: " + this.totalNoOfExecs.toString();
+                outputDiv.innerHTML = instrExecuted + "<br>" + regState ;
             } else {
                 console.error('Div with id "cpu-output-content" not found.');
             }
         }
+    },
+    execProgram: function() {
+        let keys = new Array(16).fill(0); // All keys are "not pressed" (0)
+        const outputDiv = document.getElementById("disassembly-content");
+        outputDiv.innerHTML = outputDiv.innerHTML + "<br>" + "Got here as well" 
+        
+        document.addEventListener('keydown', (event) => {
+
+            const key = event.key.toLowerCase();
+            if (key in keyMap) {
+              keys[keyMap[key]] = 1;
+              outputDiv.innerHTML = outputDiv.innerHTML + " D: " + key + ".";
+            }
+            
+            if (this.waitingForKey) {
+                this.V[this.waitingRegister] = keyMap[key];
+                this.waitingForKey = false;
+                this.waitingRegister = null;
+            }
+          });
+          
+        document.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            if (key in keyMap) {
+            
+              keys[keyMap[key]] = 0;
+              outputDiv.innerHTML = outputDiv.innerHTML + " U: " + key + ".";
+            } else {
+                return;
+            }
+          });
+        s =0;
+        // Execute the program by creating a interval call every 16ms which will execute 10 instructions and update the screen and fetch keys 
+        document.interval = setInterval(() => {
+            for (let i = 0; i < 44; i++) {
+                str = this.executeInstruction();
+                // Keyboard input is obtained async through the EventListeners
+            }
+            s++;
+            if (s > 100) {
+                outputDiv.innerHTML = outputDiv.innerHTML + ".";
+                s = 0;
+            }
+            updateScreen();
+        }, 16);
+        
     }
+        
 };
 
 
@@ -606,9 +702,15 @@ function disassemble_instruction(b1, b2) {
 function stepCPU() {
     // Execute a single instruction
     chipCPU.wrappedExec();
-    // Update the screen
-    // updateScreen();
 }
+
+function runCPU() {
+    // Execute a single instruction
+    const outputDiv = document.getElementById("disassembly-content");
+    outputDiv.innerHTML = outputDiv.innerHTML + "<br>" + "Got here" 
+    chipCPU.execProgram();
+}
+
 
 function keyPress() {
     // Handle key press events
