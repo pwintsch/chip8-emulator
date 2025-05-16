@@ -1,1 +1,11 @@
-- Analyse whether key listeners are actually working and the whole waiting for keys flags working as expected
+( ) Build wait for key command
+( ) Add the 65 and 75 HP48 Flag storage commands
+( ) Change y to z for my keyboard
+( ) See how to manage multi national keyboards (qwertz and qwerty at least)
+( ) Add an escape key
+( ) Build sound timer
+( ) Clean up debug console code
+( ) Clean up CSS and HTML
+
+
+(x) Analyse whether key listeners are actually working and the whole waiting for keys flags working as expected

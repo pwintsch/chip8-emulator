@@ -146,6 +146,8 @@ var chipCPU = {
     delayTimer: 0,
     soundTimer: 0,
     totalNoOfExecs: 0,
+    stepInstr : false,
+    keys: new Array(16).fill(0), // All keys are "not pressed" (0)
     waitingForKey : false,
     waitingRegister : null,
     setupScreen: function() {
@@ -390,15 +392,19 @@ var chipCPU = {
             case 0x0E:
                 switch (b2) {
                     case 0x9E:      // SKP Vx   -  Skip next instruction if key with value of Vx is pressed.
-                        cmd = "*SKP Vx"; 
-                        if (keys[Vx] == 1) {
+                        cmd = "TBD"; 
+                        const outputDiv2 = document.getElementById("disassembly-content");
+                        outputDiv2.innerHTML = outputDiv2.innerHTML + "<br>" + "***";
+                        if (this.keys[this.V[n2]] == 1) {
                             // Key in Vx is pressed
                             this.PC += 2; // Skip next instruction
                           }
                         break;
                     case 0xA1:     // SKNP Vx   -  Skip next instruction if key with value of Vx is not pressed.
-                        cmd = "*SKNP Vx"; 
-                        if (keys[Vx] == 0) {
+                        cmd = "TBD"; 
+                        const outputDiv3 = document.getElementById("disassembly-content");
+                        outputDiv3.innerHTML = outputDiv3.innerHTML + "<br>" + "*n*";
+                        if (this.keys[this.V[n2]] == 0) {
                             // Key in Vx is not pressed
                             this.PC += 2; // Skip next instruction
                           }
@@ -409,17 +415,19 @@ var chipCPU = {
                 break;
             case 0x0F:
                 switch (b2) {
-                    case 0x07:
-                        cmd = "TBD"; // "LD V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", DT";
+                    case 0x07: // "LD Vx, DT";
+                        cmd = ""; 
+                        this.V[n2]=this.delayTimer;
                         break;
                     case 0x0A:          // LD Vx, K   -  Wait for a key press and store the value of the key in Vx.
-                        cmd = "*LD Vx, K   -  Wait for a key";
+                        cmd = "TBD";
                         this.waitingForKey = true;
                         this.waitingRegister = n2;
                         // Wait for a key press
                         break;
-                    case 0x15:
-                        cmd = "TBD"; // "LD DT, V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                    case 0x15:   // LD DT, Vx
+                        cmd = ""; 
+                        this.delayTimer = this.V[n2];
                         break;
                     case 0x18:
                         cmd = "TBD"; // "LD ST, V" + n2.toString(16).padStart(1, '0').toUpperCase();
@@ -435,7 +443,7 @@ var chipCPU = {
                         this.I = this.I & 0xFFF; // Mask I to 12 bits
                         break;
                     case 0x29:          // LD F, Vn   -  Set I = location of sprite for digit Vx.
-                        cmd = "TBD Load font sprites"; 
+                        cmd = ""; 
                         this.I = this.V[n2] * 5; // Assuming a font set of 5 bytes per character
                         break;
                     case 0x33:      // LD B, Vx   -  Store BCD representation of Vx in memory locations I, I+1, and I+2.
@@ -470,15 +478,17 @@ var chipCPU = {
         instr_done = false;
         if (cmd != "TBD") {
             instr_done = true;
+        } else {
+            this.stepInstr = true;
         }
 
         if (debugMode) {
             returnStr +=  disassemble_instruction (b1, b2);
         }
         if (instr_done) {
-            returnStr = "* " + currentAddr  + "  -   " + returnStr;
+            returnStr = "*" + currentAddr  + " -   <b>" + returnStr + "</b>";
         } else {
-            returnStr = "<b> " + currentAddr + " </b>  -   " + returnStr;
+            returnStr = "<em> " + currentAddr + " </em>  -   " + returnStr;
         }
         return returnStr;
         // memStr =  "0x" + b1.toString(16).padStart(2, '0').toUpperCase() + b2.toString(16).padStart(2, '0').toUpperCase();
@@ -492,36 +502,36 @@ var chipCPU = {
             str = this.executeInstruction();
             // Check if the instruction was processed
             console.log("Instruction processed: " + str);
-            if (str[0] != "*" || noOfExecs >= 0) {
+            if (str[0] != "*" || noOfExecs >= 100) {
                 instr_processed = false;
+                // display the instruction in div with id = "cpu-output-content" with state of registers
+                const outputDiv = document.getElementById("cpu-output-content");
+                if (outputDiv) {
+                    // Display the state of registers
+                    let regState = "<tt>"  + str + "<br>" + "Registers: ";
+                    for (let i = 0; i < this.V.length; i++) {
+                        regState += "V" + i.toString(16).padStart(1, '0').toUpperCase() + ": " + this.V[i].toString(16).padStart(2, '0').toUpperCase() + "<br>";
+                    }
+                    regState += "I: " + this.I.toString(16).padStart(3, '0').toUpperCase() + "<br>" + "PC: " + this.PC.toString(16).padStart(4, '0').toUpperCase() + "<br>"+ "</tt>";
+                    instrExecuted = "Exec: " + this.totalNoOfExecs.toString();
+                    outputDiv.innerHTML = instrExecuted + "<br>" + regState ;
+                } else {
+                    console.error('Div with id "cpu-output-content" not found.');
+                }
             }
             noOfExecs++;
-            // display the instruction in div with id = "cpu-output-content" with state of registers
-            const outputDiv = document.getElementById("cpu-output-content");
-            if (outputDiv) {
-                // Display the state of registers
-                let regState = "<tt>"  + str + "<br>" + "Registers: ";
-                for (let i = 0; i < this.V.length; i++) {
-                    regState += "V" + i.toString(16).padStart(1, '0').toUpperCase() + ": " + this.V[i].toString(16).padStart(2, '0').toUpperCase() + "<br>";
-                }
-                regState += "I: " + this.I.toString(16).padStart(3, '0').toUpperCase() + "<br>" + "PC: " + this.PC.toString(16).padStart(4, '0').toUpperCase() + "<br>"+ "</tt>";
-                instrExecuted = "Exec: " + this.totalNoOfExecs.toString();
-                outputDiv.innerHTML = instrExecuted + "<br>" + regState ;
-            } else {
-                console.error('Div with id "cpu-output-content" not found.');
-            }
         }
     },
     execProgram: function() {
-        let keys = new Array(16).fill(0); // All keys are "not pressed" (0)
+        this.keys.fill(0); // All keys are "not pressed" (0)
         const outputDiv = document.getElementById("disassembly-content");
-        outputDiv.innerHTML = outputDiv.innerHTML + "<br>" + "Got here as well" 
+        outputDiv.innerHTML = outputDiv.innerHTML + "<br>" + "Got here as well"; 
         
         document.addEventListener('keydown', (event) => {
 
             const key = event.key.toLowerCase();
             if (key in keyMap) {
-              keys[keyMap[key]] = 1;
+              this.keys[keyMap[key]] = 1;
               outputDiv.innerHTML = outputDiv.innerHTML + " D: " + key + ".";
             }
             
@@ -534,9 +544,8 @@ var chipCPU = {
           
         document.addEventListener('keyup', (event) => {
             const key = event.key.toLowerCase();
-            if (key in keyMap) {
-            
-              keys[keyMap[key]] = 0;
+            if (key in keyMap) {            
+              this.keys[keyMap[key]] = 0;
               outputDiv.innerHTML = outputDiv.innerHTML + " U: " + key + ".";
             } else {
                 return;
@@ -555,6 +564,12 @@ var chipCPU = {
                 s = 0;
             }
             updateScreen();
+            if (this.delayTimer>0) {
+                this.delayTimer--;
+            }
+            if (this.soundTimer>0) {
+                this.soundTimer--;
+            }
         }, 16);
         
     }
