@@ -1,5 +1,6 @@
-( ) Build wait for key command
-( ) Add the 65 and 75 HP48 Flag storage commands
+(x) Build wait for key command
+( ) Fix drawing / collision
+(X) Add the 65 and 75 HP48 Flag storage commands
 ( ) Change y to z for my keyboard
 ( ) See how to manage multi national keyboards (qwertz and qwerty at least)
 ( ) Add an escape key

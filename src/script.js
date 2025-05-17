@@ -60,11 +60,12 @@ const test_sprite = [
   ];
 
 class Chip8Display {
-    constructor(canvas, width = 64, height = 32) {
+    constructor(canvas, width = 64, height = 32, clip = true) {
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.width = width;
       this.height = height;
+      this.clipDisplay = clip;
   
       // Set physical canvas size
       canvas.width = width;
@@ -89,31 +90,42 @@ class Chip8Display {
   
     drawSprite(vx, vy, sprite) {
       let collision = 0;
-  
+      let x = 0;
+      let y = 0;
+      let startX = vx;
+      let startY = vy;  
       for (let row = 0; row < sprite.length; row++) {
         let spriteByte = sprite[row];
-  
-        for (let bit = 0; bit < 8; bit++) {
-          let pixel = (spriteByte >> (7 - bit)) & 1;
-  
-          let x = (vx + bit) % this.width;
-          let y = (vy + row) % this.height;
-          let pixelIndex = (y * this.width + x) * 4;
-  
-          if (pixel) {
-            let isCurrentlyOn = this.data[pixelIndex] === 255;
-  
-            if (isCurrentlyOn) {
-              collision = 1;
+        y = startY + row;
+        if (y >= this.height) {  
+            if (this.clipDisplay) {
+                continue;
+            } else {
+                y = y % this.height;
             }
-  
-            let newColor = isCurrentlyOn ? 0 : 255;
-  
-            this.data[pixelIndex] = newColor;
-            this.data[pixelIndex + 1] = newColor;
-            this.data[pixelIndex + 2] = newColor;
-            this.data[pixelIndex + 3] = 255;
-          }
+        }        
+        for (let bit = 0; bit < 8; bit++) {
+            let pixel = (spriteByte >> (7 - bit)) & 1;
+            if (pixel) {
+                x = startX + bit;
+                if (x >= this.width) {  
+                    if (this.clipDisplay) {
+                        continue;
+                    } else {
+                        x = x % this.width;
+                    }
+                }  
+                let pixelIndex = ((y * this.width) + x) * 4;  
+                let isCurrentlyOn = this.data[pixelIndex] === 255;  
+                if (isCurrentlyOn) {
+                    collision = 1;
+                }  
+                let newColor = isCurrentlyOn ? 0 : 255;    
+                this.data[pixelIndex] = newColor;
+                this.data[pixelIndex + 1] = newColor;
+                this.data[pixelIndex + 2] = newColor;
+                this.data[pixelIndex + 3] = 255;
+            }
         }
       }
   
@@ -139,6 +151,7 @@ var chipCPU = {
     // CPU state variables
     memory: new Uint8Array(4096), // 4KB of memory
     V: new Uint8Array(16), // 16 registers (V0 to VF)
+    hpFlags: new Uint8Array(8), // HP flags
     I: 0, // Index register
     PC: 0x200, // Program counter starts at 0x200
     stack: [], // Stack for subroutine calls
@@ -153,7 +166,7 @@ var chipCPU = {
     setupScreen: function() {
         // Setup the screen (this is a placeholder, implement actual screen setup)
         const canvas = document.getElementById('chip8-screen');
-        display = new Chip8Display(canvas);
+        display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
     },
     loadROM: function(rom) {
 
@@ -387,23 +400,19 @@ var chipCPU = {
             case 0x0D:         // DRW Vx, Vy, nibble
                 cmd = ""; 
                 sprite_to_draw = this.memory.slice(this.I, this.I + n4);
-                display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
+                this.V[0xF] = display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
                 break;
             case 0x0E:
                 switch (b2) {
                     case 0x9E:      // SKP Vx   -  Skip next instruction if key with value of Vx is pressed.
-                        cmd = "TBD"; 
-                        const outputDiv2 = document.getElementById("disassembly-content");
-                        outputDiv2.innerHTML = outputDiv2.innerHTML + "<br>" + "***";
+                        cmd = ""; 
                         if (this.keys[this.V[n2]] == 1) {
                             // Key in Vx is pressed
                             this.PC += 2; // Skip next instruction
                           }
                         break;
                     case 0xA1:     // SKNP Vx   -  Skip next instruction if key with value of Vx is not pressed.
-                        cmd = "TBD"; 
-                        const outputDiv3 = document.getElementById("disassembly-content");
-                        outputDiv3.innerHTML = outputDiv3.innerHTML + "<br>" + "*n*";
+                        cmd = ""; 
                         if (this.keys[this.V[n2]] == 0) {
                             // Key in Vx is not pressed
                             this.PC += 2; // Skip next instruction
@@ -420,7 +429,7 @@ var chipCPU = {
                         this.V[n2]=this.delayTimer;
                         break;
                     case 0x0A:          // LD Vx, K   -  Wait for a key press and store the value of the key in Vx.
-                        cmd = "TBD";
+                        cmd = "";
                         this.waitingForKey = true;
                         this.waitingRegister = n2;
                         // Wait for a key press
@@ -466,6 +475,18 @@ var chipCPU = {
                             this.V[i] = this.memory[this.I + i];
                         }
                         //this.I += n2 + 1; // Increment I by the number of registers read
+                        break;
+                    case 0x75:     // LD HP, Vx   -  store registers in HP0 to HP7  
+                        cmd = "";
+                        for (let i = 0; i <= 7; i++) {
+                            this.hpFlags[i] = this.V[i];
+                        }
+                        break;
+                    case 0x85:     // LD Vx, HP   -  read registers in HP0 to HP7
+                        cmd = "";
+                        for (let i = 0; i <= 7; i++) {
+                            this.V[i] = this.hpFlags[i];
+                        }
                         break;
                     default:
                         cmd = "TBD"; // "???";
@@ -524,44 +545,33 @@ var chipCPU = {
     },
     execProgram: function() {
         this.keys.fill(0); // All keys are "not pressed" (0)
-        const outputDiv = document.getElementById("disassembly-content");
-        outputDiv.innerHTML = outputDiv.innerHTML + "<br>" + "Got here as well"; 
         
         document.addEventListener('keydown', (event) => {
 
             const key = event.key.toLowerCase();
             if (key in keyMap) {
               this.keys[keyMap[key]] = 1;
-              outputDiv.innerHTML = outputDiv.innerHTML + " D: " + key + ".";
-            }
-            
-            if (this.waitingForKey) {
-                this.V[this.waitingRegister] = keyMap[key];
-                this.waitingForKey = false;
-                this.waitingRegister = null;
-            }
+            }       
           });
           
         document.addEventListener('keyup', (event) => {
             const key = event.key.toLowerCase();
             if (key in keyMap) {            
               this.keys[keyMap[key]] = 0;
-              outputDiv.innerHTML = outputDiv.innerHTML + " U: " + key + ".";
             } else {
                 return;
             }
+            if (this.waitingForKey) {
+                this.V[this.waitingRegister] = keyMap[key];
+                this.waitingForKey = false;
+                this.waitingRegister = null;
+            }
           });
-        s =0;
         // Execute the program by creating a interval call every 16ms which will execute 10 instructions and update the screen and fetch keys 
         document.interval = setInterval(() => {
             for (let i = 0; i < 44; i++) {
                 str = this.executeInstruction();
                 // Keyboard input is obtained async through the EventListeners
-            }
-            s++;
-            if (s > 100) {
-                outputDiv.innerHTML = outputDiv.innerHTML + ".";
-                s = 0;
             }
             updateScreen();
             if (this.delayTimer>0) {
