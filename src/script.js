@@ -59,13 +59,17 @@ const test_sprite = [
     0b10010000,
   ];
 
+
+
 class Chip8Display {
+    constructor(canvas, width = 64, height = 32, clip = true) {
     constructor(canvas, width = 64, height = 32, clip = true) {
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.width = width;
       this.height = height;
       this.clipDisplay = clip;
+      this.pixels = new Uint8Array(width * height);
   
       // Set physical canvas size
       canvas.width = width;
@@ -80,20 +84,72 @@ class Chip8Display {
     }
   
     clear() {
-      for (let i = 0; i < this.data.length; i += 4) {
+
+    for (let i = 0; i < this.data.length; i += 4) {
         this.data[i] = 0;
         this.data[i + 1] = 0;
         this.data[i + 2] = 0;
         this.data[i + 3] = 255;
+    }
+    for (let j=0; j < this.pixels.length; j++) {
+        this.pixels[j]=0;
       }
     }
-  
-    drawSprite(vx, vy, sprite) {
+
+    drawSprite_new (vx, vy, sprite) {
+        let collision = 0;
+        let x = 0;
+        let y = 0;
+        let startX = vx % this.width;
+        let startY = vy % this.height;
+        // const debugDiv = document.getElementById("cpu-output-content");
+                    /*if (debugDiv) {
+                debugDiv.innerHTML = debugDiv.innerHTML + "!";
+            }*/
+        for (let i=0; i < sprite.length; i++) {
+            let spriteByte = sprite[i];
+            for (let j = 0; j < 8; j++) {
+                if ((spriteByte & 0x80) != 0) {
+                    if (!this.clipDisplay) {
+                        x = (startX + j) % this.width;
+                        y = (startY + i) % this.height;
+                    } else {
+                        x = (startX + j);
+                        y = (startY + i);
+                        if (x >= this.width || y >= this.height) {
+                            continue;
+                        }
+                    }
+                    let pixelIndex = ((y * this.width) + x);
+                    if (this.pixels[pixelIndex] == 1) {
+                        collision = 1;
+                        this.pixels[pixelIndex] = 0;
+                    } else {
+                        //this.pixels[pixelIndex] ^= 1; // Toggle pixel
+                        this.pixels[pixelIndex] = 1;
+                    }
+                    let pixelColor = 0;
+                    if (this.pixels[pixelIndex] == 1) {
+                        pixelColor = 255; // White
+                    }
+                    this.data[pixelIndex * 4] = pixelColor; // Red
+                    this.data[pixelIndex * 4 + 1] = pixelColor; // Green
+                    this.data[pixelIndex * 4 + 2] = pixelColor; // Blue
+                    this.data[pixelIndex * 4 + 3] = 255; // Alpha
+                }
+                spriteByte <<= 1; // Shift left
+            }
+        }
+        return collision;
+    }
+
+
+    drawSprite (vx, vy, sprite) {
       let collision = 0;
       let x = 0;
       let y = 0;
-      let startX = vx;
-      let startY = vy;  
+      let startX = vx % this.width;
+      let startY = vy  % this.height;  
       for (let row = 0; row < sprite.length; row++) {
         let spriteByte = sprite[row];
         y = startY + row;
@@ -104,19 +160,27 @@ class Chip8Display {
                 y = y % this.height;
             }
         }        
+        y = startY + row;
+        if (y >= this.height) {  
+            if (this.clipDisplay) {
+                continue;
+            } else {
+                y = y % this.height;
+            }
+        }        
         for (let bit = 0; bit < 8; bit++) {
+            x = startX + bit;
+            if (x >= this.width) {  
+                if (this.clipDisplay) {
+                    continue;
+                } else {
+                    x = x % this.width;
+                }
+            } 
             let pixel = (spriteByte >> (7 - bit)) & 1;
-            if (pixel) {
-                x = startX + bit;
-                if (x >= this.width) {  
-                    if (this.clipDisplay) {
-                        continue;
-                    } else {
-                        x = x % this.width;
-                    }
-                }  
-                let pixelIndex = ((y * this.width) + x) * 4;  
-                let isCurrentlyOn = this.data[pixelIndex] === 255;  
+            let pixelIndex = ((y * this.width) + x) * 4;  
+            let isCurrentlyOn = this.data[pixelIndex] === 255;  
+            if (pixel) { 
                 if (isCurrentlyOn) {
                     collision = 1;
                 }  
@@ -136,8 +200,6 @@ class Chip8Display {
       this.ctx.putImageData(this.imageData, 0, 0);
     }
   }
-    // Initialize the Chip8 screen  
-
 
 
 function startCPU() {
@@ -152,6 +214,7 @@ var chipCPU = {
     memory: new Uint8Array(4096), // 4KB of memory
     V: new Uint8Array(16), // 16 registers (V0 to VF)
     hpFlags: new Uint8Array(8), // HP flags
+    hpFlags: new Uint8Array(8), // HP flags
     I: 0, // Index register
     PC: 0x200, // Program counter starts at 0x200
     stack: [], // Stack for subroutine calls
@@ -163,13 +226,15 @@ var chipCPU = {
     keys: new Array(16).fill(0), // All keys are "not pressed" (0)
     waitingForKey : false,
     waitingRegister : null,
+    newDrawRoutine : true,
     setupScreen: function() {
         // Setup the screen (this is a placeholder, implement actual screen setup)
         const canvas = document.getElementById('chip8-screen');
         display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
+        display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
     },
     loadROM: function(rom) {
-
+        // Load the ROM file and initialize the CPU
         this.interval = setInterval(() => {
             updateScreen();
         }, 20);
@@ -400,11 +465,16 @@ var chipCPU = {
             case 0x0D:         // DRW Vx, Vy, nibble
                 cmd = ""; 
                 sprite_to_draw = this.memory.slice(this.I, this.I + n4);
-                this.V[0xF] = display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
+                if (this.newDrawRoutine) {
+                    this.V[0xF] = display.drawSprite_new(this.V[n2], this.V[n3], sprite_to_draw);
+                } else {
+                    this.V[0xF] = display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
+                }
                 break;
             case 0x0E:
                 switch (b2) {
                     case 0x9E:      // SKP Vx   -  Skip next instruction if key with value of Vx is pressed.
+                        cmd = ""; 
                         cmd = ""; 
                         if (this.keys[this.V[n2]] == 1) {
                             // Key in Vx is pressed
@@ -412,6 +482,7 @@ var chipCPU = {
                           }
                         break;
                     case 0xA1:     // SKNP Vx   -  Skip next instruction if key with value of Vx is not pressed.
+                        cmd = ""; 
                         cmd = ""; 
                         if (this.keys[this.V[n2]] == 0) {
                             // Key in Vx is not pressed
@@ -429,6 +500,7 @@ var chipCPU = {
                         this.V[n2]=this.delayTimer;
                         break;
                     case 0x0A:          // LD Vx, K   -  Wait for a key press and store the value of the key in Vx.
+                        cmd = "";
                         cmd = "";
                         this.waitingForKey = true;
                         this.waitingRegister = n2;
@@ -475,6 +547,18 @@ var chipCPU = {
                             this.V[i] = this.memory[this.I + i];
                         }
                         //this.I += n2 + 1; // Increment I by the number of registers read
+                        break;
+                    case 0x75:     // LD HP, Vx   -  store registers in HP0 to HP7  
+                        cmd = "";
+                        for (let i = 0; i <= 7; i++) {
+                            this.hpFlags[i] = this.V[i];
+                        }
+                        break;
+                    case 0x85:     // LD Vx, HP   -  read registers in HP0 to HP7
+                        cmd = "";
+                        for (let i = 0; i <= 7; i++) {
+                            this.V[i] = this.hpFlags[i];
+                        }
                         break;
                     case 0x75:     // LD HP, Vx   -  store registers in HP0 to HP7  
                         cmd = "";
@@ -552,6 +636,7 @@ var chipCPU = {
             if (key in keyMap) {
               this.keys[keyMap[key]] = 1;
             }       
+            }       
           });
           
         document.addEventListener('keyup', (event) => {
@@ -560,6 +645,11 @@ var chipCPU = {
               this.keys[keyMap[key]] = 0;
             } else {
                 return;
+            }
+            if (this.waitingForKey) {
+                this.V[this.waitingRegister] = keyMap[key];
+                this.waitingForKey = false;
+                this.waitingRegister = null;
             }
             if (this.waitingForKey) {
                 this.V[this.waitingRegister] = keyMap[key];

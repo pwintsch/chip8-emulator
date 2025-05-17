@@ -1,6 +1,8 @@
 (x) Build wait for key command
-( ) Fix drawing / collision
+(X) Fix drawing / collision
 (X) Add the 65 and 75 HP48 Flag storage commands
+( ) Fix Quirks clipping err2
+    ( ) Adapt Disassembler to run for certain number of instructions and print instructions as it goes, and accept keyboard input to analyse quirks 
 ( ) Change y to z for my keyboard
 ( ) See how to manage multi national keyboards (qwertz and qwerty at least)
 ( ) Add an escape key
@@ -10,3 +12,187 @@
 
 
 (x) Analyse whether key listeners are actually working and the whole waiting for keys flags working as expected
+
+
+
+
+
+/// Original Chip8Screen
+
+class Chip8Display {
+    constructor(canvas, width = 64, height = 32, clip = true) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.width = width;
+      this.height = height;
+      this.clipDisplay = clip;
+      this.pixels = new Uint8Array(width * height);
+  
+      // Set physical canvas size
+      canvas.width = width;
+      canvas.height = height;
+  
+      this.imageData = this.ctx.createImageData(width, height);
+      this.data = this.imageData.data;
+  
+      // Optional: clear screen on startup
+      this.clear();
+      this.render();
+    }
+  
+    clear() {
+      for (let i = 0; i < this.data.length; i += 4) {
+        this.data[i] = 0;
+        this.data[i + 1] = 0;
+        this.data[i + 2] = 0;
+        this.data[i + 3] = 255;
+      }
+    }
+  
+    drawSprite(vx, vy, sprite) {
+      let collision = 0;
+      let x = 0;
+      let y = 0;
+      let startX = vx % this.width;
+      let startY = vy  % this.height;  
+      for (let row = 0; row < sprite.length; row++) {
+        let spriteByte = sprite[row];
+        y = startY + row;
+        if (y >= this.height) {  
+            if (this.clipDisplay) {
+                continue;
+            } else {
+                y = y % this.height;
+            }
+        }        
+        for (let bit = 0; bit < 8; bit++) {
+            let pixel = (spriteByte >> (7 - bit)) & 1;
+            if (pixel) {
+                x = startX + bit;
+                if (x >= this.width) {  
+                    if (this.clipDisplay) {
+                        continue;
+                    } else {
+                        x = x % this.width;
+                        //y+= 1;
+                    }
+                }  
+                let pixelIndex = ((y * this.width) + x) * 4;  
+                let isCurrentlyOn = this.data[pixelIndex] === 255;  
+                if (isCurrentlyOn) {
+                    collision = 1;
+                }  
+                let newColor = isCurrentlyOn ? 0 : 255;    
+                this.data[pixelIndex] = newColor;
+                this.data[pixelIndex + 1] = newColor;
+                this.data[pixelIndex + 2] = newColor;
+                this.data[pixelIndex + 3] = 255;
+            }
+        }
+      }
+  
+      return collision;
+    }
+  
+    render() {
+      this.ctx.putImageData(this.imageData, 0, 0);
+    }
+  }
+
+
+
+class Chip8Display_v2 {
+    constructor(canvas, width = 64, height = 32, clip = false) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.width = width;
+      this.height = height;
+      this.clipDisplay = clip;
+      this.pixels = new Array(width * height).fill(false);
+  
+      // Set physical canvas size
+      canvas.width = width;
+      canvas.height = height;
+  
+      this.imageData = this.ctx.createImageData(width, height);
+      this.data = this.imageData.data;
+  
+      // Optional: clear screen on startup
+      this.clear();
+      this.render();
+    }
+  
+    clear() {
+      for (let i = 0; i < this.data.length; i += 4) {
+        this.data[i] = 0;
+        this.data[i + 1] = 0;
+        this.data[i + 2] = 0;
+        this.data[i + 3] = 255;
+      }
+    }
+  
+    drawSprite(vx, vy, sprite) {
+      let collision = 0;
+      let x = 0;
+      let y = 0;
+      let startX = vx % this.width;
+      let startY = vy  % this.height;  
+      for (let row = 0; row < sprite.length; row++) {
+        let spriteByte = sprite[row];
+        y = startY + row;
+        if (y >= this.height) {  
+            if (this.clipDisplay) {
+                continue;
+            } else {
+                y = y % this.height;
+            }
+        }        
+        for (let bit = 0; bit < 8; bit++) {
+            let pixel = (spriteByte >> (7 - bit)) & 1;
+            if (pixel) {
+                x = startX + bit;
+                if (x >= this.width) {  
+                    if (this.clipDisplay) {
+                        continue;
+                    } else {
+                        x = x % this.width;
+                        //y+= 1;
+                    }
+                }  
+                let pixelIndex = ((y * this.width) + x) * 4;  
+                let isCurrentlyOn = this.data[pixelIndex] === 255;  
+                if (isCurrentlyOn) {
+                    collision = 1;
+                }  
+                let newColor = isCurrentlyOn ? 0 : 255;    
+                this.data[pixelIndex] = newColor;
+                this.data[pixelIndex + 1] = newColor;
+                this.data[pixelIndex + 2] = newColor;
+                this.data[pixelIndex + 3] = 255;
+            }
+        }
+      }
+  
+      return collision;
+    }
+  
+    render() {
+        
+    // Update the canvas with the pixel data
+    let dataStart = 0;
+    let color = 0;
+    for (let i = 0; i < this.pixels.length; i += 1) {
+        if (this.pixels[i]) {
+            color = 255; // White
+        } else {
+            color = 0; // Black
+        }
+        dataStart = i * 4;
+        this.data[dataStart] = 255;     // Red
+        this.data[dataStart + 1] = 255; // Green
+        this.data[dataStart + 2] = 255; // Blue
+        this.data[dataStart + 3] = 255; // Alpha
+    } 
+    this.ctx.putImageData(this.imageData, 0, 0);
+    }
+  }
