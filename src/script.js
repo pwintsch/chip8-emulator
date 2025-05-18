@@ -63,7 +63,6 @@ const test_sprite = [
 
 class Chip8Display {
     constructor(canvas, width = 64, height = 32, clip = true) {
-    constructor(canvas, width = 64, height = 32, clip = true) {
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.width = width;
