@@ -221,7 +221,7 @@ var chipCPU = {
     delayTimer: 0,
     soundTimer: 0,
     totalNoOfExecs: 0,
-    stepInstr : false,
+    stepInstr : true,
     keys: new Array(16).fill(0), // All keys are "not pressed" (0)
     waitingForKey : false,
     waitingRegister : null,
@@ -385,13 +385,14 @@ var chipCPU = {
                     case 0x4:      // ADD Vx, Vy
                         cmd = ""; 
                         // Set VF to 1 if there is no carry
-                        if (this.V[n2] + this.V[n3] > 0xFF) {
+                        let temp = this.V[n2] + this.V[n3];
+                        if (temp > 0xFF) {
+                            this.V[n2] = temp & 0xFF; // Mask to 8 bits
                             this.V[0xF] = 1; // Set VF to 1 if there is a carry
                         } else {
+                            this.V[n2] = temp; // Mask to 8 bits
                             this.V[0xF] = 0; // Set VF to 0 if there is no carry
                         }
-                        // Set the result in Vx
-                        this.V[n2] = (this.V[n2] + this.V[n3]) & 0xFF; // Mask to 8 bits
                         break;
                     case 0x5:         // SUB Vx, Vy
                         cmd = ""; // "SUB V" + n2.toString(16).padStart(1, '0').toUpperCase() + ", V" + n3.toString(16).padStart(1, '0').toUpperCase();
@@ -605,7 +606,7 @@ var chipCPU = {
             str = this.executeInstruction();
             // Check if the instruction was processed
             console.log("Instruction processed: " + str);
-            if (str[0] != "*" || noOfExecs >= 100) {
+            if (str[0] != "*" || noOfExecs >= 100 || this.stepInstr) {
                 instr_processed = false;
                 // display the instruction in div with id = "cpu-output-content" with state of registers
                 const outputDiv = document.getElementById("cpu-output-content");
