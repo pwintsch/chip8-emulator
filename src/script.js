@@ -230,7 +230,6 @@ var chipCPU = {
         // Setup the screen (this is a placeholder, implement actual screen setup)
         const canvas = document.getElementById('chip8-screen');
         display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
-        display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
     },
     loadROM: function(rom) {
         // Load the ROM file and initialize the CPU
@@ -635,7 +634,7 @@ var chipCPU = {
             if (key in keyMap) {
               this.keys[keyMap[key]] = 1;
             }       
-            }       
+       
           });
           
         document.addEventListener('keyup', (event) => {
