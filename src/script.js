@@ -95,7 +95,7 @@ class Chip8Display {
       }
     }
 
-    drawSprite_new (vx, vy, sprite) {
+    drawSprite (vx, vy, sprite) {
         let collision = 0;
         let x = 0;
         let y = 0;
@@ -141,59 +141,6 @@ class Chip8Display {
         }
         return collision;
     }
-
-
-    drawSprite (vx, vy, sprite) {
-      let collision = 0;
-      let x = 0;
-      let y = 0;
-      let startX = vx % this.width;
-      let startY = vy  % this.height;  
-      for (let row = 0; row < sprite.length; row++) {
-        let spriteByte = sprite[row];
-        y = startY + row;
-        if (y >= this.height) {  
-            if (this.clipDisplay) {
-                continue;
-            } else {
-                y = y % this.height;
-            }
-        }        
-        y = startY + row;
-        if (y >= this.height) {  
-            if (this.clipDisplay) {
-                continue;
-            } else {
-                y = y % this.height;
-            }
-        }        
-        for (let bit = 0; bit < 8; bit++) {
-            x = startX + bit;
-            if (x >= this.width) {  
-                if (this.clipDisplay) {
-                    continue;
-                } else {
-                    x = x % this.width;
-                }
-            } 
-            let pixel = (spriteByte >> (7 - bit)) & 1;
-            let pixelIndex = ((y * this.width) + x) * 4;  
-            let isCurrentlyOn = this.data[pixelIndex] === 255;  
-            if (pixel) { 
-                if (isCurrentlyOn) {
-                    collision = 1;
-                }  
-                let newColor = isCurrentlyOn ? 0 : 255;    
-                this.data[pixelIndex] = newColor;
-                this.data[pixelIndex + 1] = newColor;
-                this.data[pixelIndex + 2] = newColor;
-                this.data[pixelIndex + 3] = 255;
-            }
-        }
-      }
-  
-      return collision;
-    }
   
     render() {
       this.ctx.putImageData(this.imageData, 0, 0);
@@ -208,11 +155,49 @@ function startCPU() {
 }
 
 
+class Beeper {
+  constructor() {
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this.oscillator = null;
+    this.isBeeping = false;
+
+
+    // Unlock audio context on first user interaction
+    document.addEventListener('keydown', () => {
+        
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+    }, { once: true });
+  }
+
+  start() {
+    if (this.isBeeping) return;
+
+    this.oscillator = this.audioCtx.createOscillator();
+    this.oscillator.type = 'square'; // Retro sound
+    this.oscillator.frequency.value = 440; // A4 pitch (can change to 800 for more buzz)
+    this.oscillator.connect(this.audioCtx.destination);
+    this.oscillator.start();
+    
+    this.isBeeping = true;
+  }
+
+  stop() {
+    if (!this.isBeeping) return;
+    this.oscillator.stop();
+    this.oscillator.disconnect();
+    this.oscillator = null;
+    this.isBeeping = false;
+  }
+}
+
+
+
 var chipCPU = {
     // CPU state variables
     memory: new Uint8Array(4096), // 4KB of memory
     V: new Uint8Array(16), // 16 registers (V0 to VF)
-    hpFlags: new Uint8Array(8), // HP flags
     hpFlags: new Uint8Array(8), // HP flags
     I: 0, // Index register
     PC: 0x200, // Program counter starts at 0x200
@@ -225,11 +210,12 @@ var chipCPU = {
     keys: new Array(16).fill(0), // All keys are "not pressed" (0)
     waitingForKey : false,
     waitingRegister : null,
-    newDrawRoutine : true,
     setupScreen: function() {
         // Setup the screen (this is a placeholder, implement actual screen setup)
         const canvas = document.getElementById('chip8-screen');
         display = new Chip8Display(canvas, width = 64, height = 32, clip = true);
+        this.beeper = new Beeper();
+        
     },
     loadROM: function(rom) {
         // Load the ROM file and initialize the CPU
@@ -464,11 +450,7 @@ var chipCPU = {
             case 0x0D:         // DRW Vx, Vy, nibble
                 cmd = ""; 
                 sprite_to_draw = this.memory.slice(this.I, this.I + n4);
-                if (this.newDrawRoutine) {
-                    this.V[0xF] = display.drawSprite_new(this.V[n2], this.V[n3], sprite_to_draw);
-                } else {
-                    this.V[0xF] = display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
-                }
+                this.V[0xF] = display.drawSprite(this.V[n2], this.V[n3], sprite_to_draw);
                 break;
             case 0x0E:
                 switch (b2) {
@@ -510,7 +492,8 @@ var chipCPU = {
                         this.delayTimer = this.V[n2];
                         break;
                     case 0x18:
-                        cmd = "TBD"; // "LD ST, V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                        cmd = ""; // "LD ST, V" + n2.toString(16).padStart(1, '0').toUpperCase();
+                        this.soundTimer = this.V[n2];
                         break;
                     case 0x1E:      // ADD I, Vx
                         cmd = ""; 
@@ -627,6 +610,7 @@ var chipCPU = {
         }
     },
     execProgram: function() {
+        // Execute the program
         this.keys.fill(0); // All keys are "not pressed" (0)
         
         document.addEventListener('keydown', (event) => {
@@ -634,8 +618,7 @@ var chipCPU = {
             const key = event.key.toLowerCase();
             if (key in keyMap) {
               this.keys[keyMap[key]] = 1;
-            }       
-       
+            } 
           });
           
         document.addEventListener('keyup', (event) => {
@@ -667,7 +650,10 @@ var chipCPU = {
                 this.delayTimer--;
             }
             if (this.soundTimer>0) {
+                this.beeper.start();
                 this.soundTimer--;
+            } else {
+                this.beeper.stop();
             }
         }, 16);
         
@@ -849,26 +835,14 @@ function keyPress() {
 }
 
 function updateScreen() {
-
-    // Here you would typically update the game state and redraw the screen
-    // For example, you could draw a rectangle:
-    //myScreen.context.fillStyle = "green";
-    //myScreen.context.fillRect(myScreen.circleX, myScreen.circleY, 10, 10);
-    // ;
-    /*
-        myX += 1;
-        if (myX > 55) {
-            myX = 1;
-        }
-        // Draw it at (5, 5)
-        display.drawSprite(myX, myY, test_sprite);
-    */
+    // Update the screen with the current state of the pixels
     display.render();
 }
 
-// LoadRom function set vale of ROM to be fetched
+
 
 function loadROM(rom_file) {
+    // LoadRom function set vale of ROM to be fetched
     currentRom = rom_file+".ch8";
     console.log("ROM file set to: " + currentRom);
     // load ROM in CPU
@@ -876,8 +850,6 @@ function loadROM(rom_file) {
 
 }
 
-
-// Function to fetch the ROM file and display its contents
 
 
 function disassemble() {

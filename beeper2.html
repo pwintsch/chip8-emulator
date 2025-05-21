@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chip-8 Beep Test</title>
+  </head>
+  <body>
+    <h1>Press any key to beep!</h1>
+    <script>
+      class Beeper {
+        constructor() {
+          this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          this.oscillator = null;
+          this.isBeeping = false;
+
+          document.addEventListener('keydown', () => {
+            if (this.audioCtx.state === 'suspended') {
+              this.audioCtx.resume();
+            }
+          }, { once: true });
+        }
+
+        start() {
+          if (this.isBeeping) return;
+
+          this.oscillator = this.audioCtx.createOscillator();
+          this.oscillator.type = 'square';
+          this.oscillator.frequency.setValueAtTime(440, this.audioCtx.currentTime);
+          this.oscillator.connect(this.audioCtx.destination);
+          this.oscillator.start();
+          this.isBeeping = true;
+        }
+
+        stop() {
+          if (!this.isBeeping) return;
+
+          this.oscillator.stop();
+          this.oscillator.disconnect();
+          this.oscillator = null;
+          this.isBeeping = false;
+        }
+      }
+
+      const beeper = new Beeper();
+      let soundTimer = 0;
+
+      function updateTimers() {
+        if (soundTimer > 0) {
+          soundTimer--;
+          beeper.start();
+        } else {
+          beeper.stop();
+        }
+      }
+
+      // Simulate tick at 60Hz
+      setInterval(updateTimers, 1000 / 60);
+
+      // Trigger beep manually
+      document.addEventListener('keydown', () => {
+        soundTimer = 20; // ~333ms
+      });
+    </script>
+  </body>
+</html>

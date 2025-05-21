@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Chip-8 Sound Test</title>
+</head>
+<body>
+  <h2>Press any key to play a beep (440Hz square wave)</h2>
+  <script>
+    // Audio context setup
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillator = null;
+
+    function startBeep() {
+      if (oscillator) return; // Already beeping
+      oscillator = audioCtx.createOscillator();
+      oscillator.frequency.value = 440; // A4 pitch
+      oscillator.type = 'square'; // Retro tone
+      oscillator.connect(audioCtx.destination);
+      oscillator.start();
+    }
+
+    function stopBeep() {
+      if (!oscillator) return;
+      oscillator.stop();
+      oscillator.disconnect();
+      oscillator = null;
+    }
+
+    // Simulate Chip-8 sound timer
+    let soundTimer = 10; // Start with some value (like ST=10)
+    function tick() {
+      if (soundTimer > 0) {
+        soundTimer--;
+        startBeep();
+      } else {
+        stopBeep();
+      }
+    }
+
+    // Run 60 times per second like Chip-8 timer
+    setInterval(tick, 1000 / 60);
+
+    // Resume audio context on first key press (required by browser)
+    document.addEventListener('keydown', () => {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      // Reset sound timer for demo
+      soundTimer = 30; // About half a second of buzz
+    });
+  </script>
+</body>
+</html>
