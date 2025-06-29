@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chip-8 Emulator</title>
+  <link rel="stylesheet" href="styles2.css">
+</head>
+<body>
+  <div class="crt-wrapper">
+    <div class="crt">
+      <canvas id="chip8-screen" width="64" height="32"></canvas>
+      <div class="scanlines"></div>
+    </div>
+
+    <div class="controls">
+    <label class="led-label">
+        <span class="led on"></span> POWER
+    </label>
+    <button id="reset-btn" class="retro-btn">RESET</button>
+    <label for="rom_select" class="load-label">Select ROM</label>
+    <select name="rom_select" id="rom_select" onchange="loadROM(this.value)" class="load-select">
+        <option disabled selected value> SELECT ROM </option>
+        <option value="chip8-logo">Chip 8 logo</option>
+        <option value="BC_test">BC Test</option>
+        <option value="ibm-logo">IBM logo</option>
+        <option value="quirks">Quirks</option>
+        <option value="6-keypad">6 Keypad</option>
+        <option value="invaders">Invaders</option>
+        <option value="BLITZ">Blitz</option>
+        <option value="SCTEST">SC test</option>
+        <option value="3-corax+">Test opcode</option>
+        <option value="cliptest">my test</option>
+        <option value="7-beep">Beep test</option>
+    </select>
+    </div>
+</div>
+  <script src="src/script.js"></script>
+</body>
+</html>
